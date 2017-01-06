@@ -1,10 +1,31 @@
 #!/bin/bash
-
-DEFAULT_ROOT_NETWORKID="172.17.0.1/255.255.255.0"
+BACKUPVOL=/dockerbackup
+DEFAULT_ROOT_NETWORKID="172.17.0.0/255.255.255.0"
 DEFAULT_DBVOL=${PWD}/mysql
 DEFAULT_CUSTOMCONFIG=${PWD}/custom.cnf
 
 read -p "Password for mysql root user: " ROOT_PASSWORD
+
+read -p "Do you want to use custom network? (y/n) " yn
+case $yn in
+    [Yy]* ) 
+            read -p "Custom network name : " CUSTOMNETWORKNAME
+            LOCALNETWORK_IP=$(docker network inspect \
+                ${CUSTOMNETWORKNAME} | grep Subnet | sed 's/\"//g' | cut -d: -f2 | cut -d/ -f1)
+            MASK_LEN=$(docker network inspect \
+                ${CUSTOMNETWORKNAME} | grep Subnet | sed 's/\"//g' | cut -d/ -f2 | cut -d, -f1)
+	    LOCALNETWORK_IP=$(echo ${LOCALNETWORK_IP} | sed -e 's/^[ \t]*//')
+
+            ONES=1111111111111111111111111111111111111111
+            ZEROES=0000000000000000000000000000000000000000
+            BITMAP_MASK=${ONES:0:${MASK_LEN}}${ZEROES:0:((24-$MASK_LEN))}
+            LOCALNETWORK_MASK="$((2#${BITMAP_MASK:0:8}))"."$((2#${BITMAP_MASK:8:8}))"."$((2#${BITMAP_MASK:16:8}))"."$((2#${BITMAP_MASK:24:8}))"
+            if [ ! -z $CUSTOMNETWORKNAME ]; then CUSTOMNETWORK=--net=${CUSTOMNETWORKNAME}; fi
+            DEFAULT_ROOT_NETWORKID=${LOCALNETWORK_IP}/${LOCALNETWORK_MASK}
+	    ;;
+        * ) CUSTOMNETWORK=
+	    ;;
+esac
 
 read -p "Ip-address/Mask to give root remote access (${DEFAULT_ROOT_NETWORKID}):" ALLOWED_ROOT_NETWORKID
 if [ -z $ALLOWED_ROOT_NETWORKID ]; then
@@ -34,28 +55,18 @@ case $yn in
 	    ;;
 esac
 
-read -p "Do you want to use custom network? (y/n) " yn
-case $yn in
-    [Yy]* ) 
-	    read -p "Custom network name : " CUSTOMNETWORKNAME
-	    if  [ -z $CUSTOMNERWORKNAME ]; then
-		   CUSTOMNETWORK="--net ${CUSTOMNETWORKNAME}"
-	    fi;;
-        * ) CUSTOMNETWORK=
-	    ;;
-esac
-
 #docker rm mysql
 docker run \
 	-h dbserver \
 	-v ${DBVOL}:/var/lib/mysql \
+	-v ${BACKUPVOL}:/backup \
 	${CUSTOMCONFIG} \
 	-e MYSQL_ROOT_PASSWORD=$ROOT_PASSWORD \
 	-e MYSQL_ROOT_HOST=${ALLOWED_ROOT_NETWORKID} \
 	--name mysql \
 	${CUSTOMNETWORK} \
 	${FIXED_IP_ADDRESS} \
-	-d tgiesela/mysql:v0.1
+	-d tonny/mysql:v0.1
 
 
 
