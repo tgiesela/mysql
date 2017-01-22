@@ -1,10 +1,15 @@
 #!/bin/bash
-BACKUPVOL=/dockerbackup
+BACKUPVOL=/dockerbackup/mysql
 DEFAULT_ROOT_NETWORKID="172.17.0.0/255.255.255.0"
 DEFAULT_DBVOL=${PWD}/mysql
-DEFAULT_CUSTOMCONFIG=${PWD}/custom.cnf
+DEFAULT_CUSTOMCONFIG=${PWD}/my.cnf
 
-read -p "Password for mysql root user: " ROOT_PASSWORD
+read -p "Password for mysql root user (leave empty for existing DB): " ROOT_PASSWORD
+if [ -z ${ROOT_PASSWORD} ]; then
+    ENV_ROOT_PASSWORD=""
+else
+    ENV_ROOT_PASSWORD="-e MYSQL_ROOT_PASSWORD=${ROOT_PASSWORD}"
+fi
 
 read -p "Do you want to use custom network? (y/n) " yn
 case $yn in
@@ -50,23 +55,25 @@ case $yn in
 	    read -p "Custom mysql config file (${DEFAULT_CUSTOMCONFIG}) : " CUSTOMCONFIG
 	    if  [ -z $CUSTOMCONFIG ]; then
 		   CUSTOMCONFIG="-v ${DEFAULT_CUSTOMCONFIG}:/custom.cnf:/etc/my.cnf"
+	    else
+		   CUSTOMCONFIG="-v ${CUSTOMCONFIG}:/etc/my.cnf"
 	    fi;;
         * ) CUSTOMCONFIG=
 	    ;;
 esac
 
 #docker rm mysql
-docker run \
+echo docker run \
 	-h dbserver \
 	-v ${DBVOL}:/var/lib/mysql \
 	-v ${BACKUPVOL}:/backup \
 	${CUSTOMCONFIG} \
-	-e MYSQL_ROOT_PASSWORD=$ROOT_PASSWORD \
+	${ENV_ROOT_PASSWORD} \
 	-e MYSQL_ROOT_HOST=${ALLOWED_ROOT_NETWORKID} \
 	--name mysql \
 	${CUSTOMNETWORK} \
 	${FIXED_IP_ADDRESS} \
-	-d tonny/mysql:v0.1
+	-d tgiesela/mysql:v0.1
 
 
 
