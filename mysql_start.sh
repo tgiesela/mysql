@@ -1,5 +1,5 @@
 #!/bin/bash
-BACKUPVOL=/dockerbackup/mysql
+BACKUPVOL=/dockerbackup
 DEFAULT_ROOT_NETWORKID="172.17.0.0/255.255.255.0"
 DEFAULT_DBVOL=${PWD}/mysql
 DEFAULT_CUSTOMCONFIG=${PWD}/my.cnf
@@ -63,7 +63,7 @@ case $yn in
 esac
 
 #docker rm mysql
-echo docker run \
+docker run \
 	-h dbserver \
 	-v ${DBVOL}:/var/lib/mysql \
 	-v ${BACKUPVOL}:/backup \
